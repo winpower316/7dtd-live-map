@@ -8,6 +8,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from auth_gateway import (
     ActivityStore,
@@ -30,7 +31,27 @@ from auth_gateway import (
     validate_player_profiles,
     validate_server_status,
     validate_server_version,
+    _env_int,
 )
+
+
+class EnvironmentConfigurationTests(unittest.TestCase):
+    def test_integer_setting_uses_default_and_override(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(_env_int("TEST_SETTING", 10, 1, 20), 10)
+        with patch.dict("os.environ", {"TEST_SETTING": "15"}, clear=True):
+            self.assertEqual(_env_int("TEST_SETTING", 10, 1, 20), 15)
+
+    def test_integer_setting_rejects_invalid_or_unsafe_value(self) -> None:
+        for value in ("invalid", "0", "21"):
+            with self.subTest(value=value):
+                with patch.dict(
+                    "os.environ",
+                    {"TEST_SETTING": value},
+                    clear=True,
+                ):
+                    with self.assertRaises(RuntimeError):
+                        _env_int("TEST_SETTING", 10, 1, 20)
 
 
 class AuthStoreTests(unittest.TestCase):

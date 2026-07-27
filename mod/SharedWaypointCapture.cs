@@ -11,9 +11,7 @@ public sealed class ModApi : IModApi
 {
     public void InitMod(Mod _modInstance)
     {
-        SharedWaypointStore.Initialize(
-            Path.Combine(_modInstance.Path, "shared-waypoints.json")
-        );
+        SharedWaypointStore.Initialize(_modInstance.Path);
         new Harmony("org.7dtdlivemap.servertools").PatchAll();
         Debug.Log("[LiveMapServerTools] shared waypoint capture enabled");
     }
@@ -60,19 +58,26 @@ public static class WaypointInviteServerPatch
 
 public static class SharedWaypointStore
 {
-    private const int MaximumEntries = 200;
+    private const int DefaultMaximumEntries = 200;
+    private const int HighestMaximumEntries = 5000;
     private static readonly object SyncRoot = new object();
     private static string storePath;
+    private static int maximumEntries = DefaultMaximumEntries;
 
-    public static void Initialize(string path)
+    public static void Initialize(string modPath)
     {
         lock (SyncRoot)
         {
-            storePath = path;
+            storePath = Path.Combine(modPath, "shared-waypoints.json");
+            maximumEntries = LoadMaximumEntries(modPath);
             if (!File.Exists(storePath))
             {
                 File.WriteAllText(storePath, "[]");
             }
+            Debug.Log(
+                "[LiveMapServerTools] sharedWaypointMaximumEntries="
+                + maximumEntries
+            );
         }
     }
 
@@ -128,9 +133,9 @@ public static class SharedWaypointStore
                     z = position.z,
                 },
             });
-            if (entries.Count > MaximumEntries)
+            if (entries.Count > maximumEntries)
             {
-                entries.RemoveRange(0, entries.Count - MaximumEntries);
+                entries.RemoveRange(0, entries.Count - maximumEntries);
             }
 
             string temporaryPath = storePath + ".new";
@@ -167,6 +172,48 @@ public static class SharedWaypointStore
         return normalized.Length <= maximumLength
             ? normalized
             : normalized.Substring(0, maximumLength);
+    }
+
+    private static int LoadMaximumEntries(string modPath)
+    {
+        string configPath = Path.Combine(modPath, "config.json");
+        if (!File.Exists(configPath))
+        {
+            return DefaultMaximumEntries;
+        }
+
+        try
+        {
+            LiveMapServerToolsConfig config = JsonConvert.DeserializeObject<
+                LiveMapServerToolsConfig
+            >(File.ReadAllText(configPath));
+            int configuredValue = config?.sharedWaypointMaximumEntries
+                ?? DefaultMaximumEntries;
+            if (
+                configuredValue < 1
+                || configuredValue > HighestMaximumEntries
+            )
+            {
+                throw new InvalidDataException(
+                    "sharedWaypointMaximumEntries must be between 1 and "
+                    + HighestMaximumEntries
+                );
+            }
+            return configuredValue;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError(
+                "[LiveMapServerTools] cannot read config.json; using default: "
+                + exception.Message
+            );
+            return DefaultMaximumEntries;
+        }
+    }
+
+    private sealed class LiveMapServerToolsConfig
+    {
+        public int? sharedWaypointMaximumEntries { get; set; }
     }
 
     private sealed class SharedWaypointEntry

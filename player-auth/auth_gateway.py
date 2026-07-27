@@ -26,8 +26,26 @@ from pathlib import Path
 from typing import Any
 
 
+def _env_int(
+    name: str,
+    default: int,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError as exception:
+        raise RuntimeError(f"{name} must be an integer") from exception
+    if value < minimum or value > maximum:
+        raise RuntimeError(
+            f"{name} must be between {minimum} and {maximum}"
+        )
+    return value
+
+
 LISTEN_HOST = os.getenv("LISTEN_HOST", "0.0.0.0")
-LISTEN_PORT = int(os.getenv("LISTEN_PORT", "8080"))
+LISTEN_PORT = _env_int("LISTEN_PORT", 8080, 1, 65535)
 PASSWORD_HASH_FILE = Path(
     os.getenv("PASSWORD_HASH_FILE", "/run/secrets/player_map_password_hash")
 )
@@ -57,29 +75,47 @@ ACTIVITY_API_TOKEN_NAME = os.getenv(
     "ACTIVITY_API_TOKEN_NAME",
     "map-activity-reader",
 )
-ACTIVITY_POLL_SECONDS = int(os.getenv("ACTIVITY_POLL_SECONDS", "10"))
-ACTIVITY_RETENTION_SECONDS = int(
-    os.getenv("ACTIVITY_RETENTION_SECONDS", "604800")
+ACTIVITY_POLL_SECONDS = _env_int(
+    "ACTIVITY_POLL_SECONDS", 10, 1, 3600
 )
-ACTIVITY_MAX_EVENTS = int(os.getenv("ACTIVITY_MAX_EVENTS", "2000"))
-ACTIVITY_PUBLIC_LIMIT = int(os.getenv("ACTIVITY_PUBLIC_LIMIT", "200"))
-MAX_FAILURES = int(os.getenv("MAX_FAILURES", "5"))
-FAILURE_WINDOW_SECONDS = int(os.getenv("FAILURE_WINDOW_SECONDS", "3600"))
-BLOCK_SECONDS = int(os.getenv("BLOCK_SECONDS", "86400"))
+ACTIVITY_RETENTION_SECONDS = _env_int(
+    "ACTIVITY_RETENTION_SECONDS", 604800, 60, 31536000
+)
+ACTIVITY_MAX_EVENTS = _env_int(
+    "ACTIVITY_MAX_EVENTS", 2000, 1, 100000
+)
+ACTIVITY_PUBLIC_LIMIT = _env_int(
+    "ACTIVITY_PUBLIC_LIMIT", 200, 1, 10000
+)
+MAX_FAILURES = _env_int("MAX_FAILURES", 5, 1, 100)
+FAILURE_WINDOW_SECONDS = _env_int(
+    "FAILURE_WINDOW_SECONDS", 3600, 1, 604800
+)
+BLOCK_SECONDS = _env_int("BLOCK_SECONDS", 86400, 1, 31536000)
 RESTART_ENABLED = os.getenv(
     "RESTART_ENABLED",
     "false",
 ).strip().lower() in {"1", "true", "yes", "on"}
-RESTART_DELAY_SECONDS = int(os.getenv("RESTART_DELAY_SECONDS", "300"))
-RESTART_COOLDOWN_SECONDS = int(os.getenv("RESTART_COOLDOWN_SECONDS", "1800"))
-RESTART_FAILURE_COOLDOWN_SECONDS = int(
-    os.getenv("RESTART_FAILURE_COOLDOWN_SECONDS", "300")
+RESTART_DELAY_SECONDS = _env_int(
+    "RESTART_DELAY_SECONDS", 300, 10, 86400
+)
+RESTART_COOLDOWN_SECONDS = _env_int(
+    "RESTART_COOLDOWN_SECONDS", 1800, 0, 604800
+)
+RESTART_FAILURE_COOLDOWN_SECONDS = _env_int(
+    "RESTART_FAILURE_COOLDOWN_SECONDS", 300, 0, 604800
 )
 AUTH_USERNAME = os.getenv("AUTH_USERNAME", "map")
-PBKDF2_ITERATIONS = 600_000
-MAX_REQUEST_BODY_BYTES = 262144
-MAX_MAP_ENTITIES = 500
-MAX_PLAYER_PROFILES = 100
+PBKDF2_ITERATIONS = _env_int(
+    "PBKDF2_ITERATIONS", 600000, 100000, 10000000
+)
+MAX_REQUEST_BODY_BYTES = _env_int(
+    "MAX_REQUEST_BODY_BYTES", 262144, 1024, 16777216
+)
+MAX_MAP_ENTITIES = _env_int("MAX_MAP_ENTITIES", 500, 1, 5000)
+MAX_PLAYER_PROFILES = _env_int(
+    "MAX_PLAYER_PROFILES", 100, 1, 1000
+)
 SERVER_VERSION_PATTERN = re.compile(
     r"^V \d+\.\d+\.\d+ \(b\d+\)$"
 )

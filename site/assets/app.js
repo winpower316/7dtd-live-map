@@ -1,8 +1,29 @@
 (() => {
   "use strict";
 
-  const MAP_NATIVE_MAX_ZOOM = 4;
-  const MAP_TILE_SIZE = 128;
+  const runtimeConfig = window.LIVE_MAP_CONFIG || {};
+  const configNumber = (name, fallback, minimum = 0) => {
+    const value = Number(runtimeConfig[name]);
+    return Number.isFinite(value) && value >= minimum ? value : fallback;
+  };
+  const configInteger = (name, fallback, minimum = 0) => {
+    const value = configNumber(name, fallback, minimum);
+    return Number.isInteger(value) ? value : fallback;
+  };
+  const configIntegerList = (name, fallback) => {
+    const rawValue = runtimeConfig[name];
+    const values = Array.isArray(rawValue)
+      ? rawValue
+      : String(rawValue || "").split(",");
+    const normalized = values.map(Number);
+    return normalized.length > 0
+      && normalized.every((value) => Number.isInteger(value) && value >= 0)
+      ? normalized
+      : fallback;
+  };
+
+  const MAP_NATIVE_MAX_ZOOM = configInteger("mapNativeMaxZoom", 4);
+  const MAP_TILE_SIZE = configInteger("mapTileSize", 128, 32);
   const MAP_SCALE_DIVISOR = 2 ** MAP_NATIVE_MAX_ZOOM;
   const CONFIG_URL = "/api/map/config";
   const STATS_URL = "/api/serverstats";
@@ -19,27 +40,59 @@
   const RESTART_REQUEST_URL = "/api/restart/request";
   const RESTART_CANCEL_URL = "/api/restart/cancel";
   const APP_VERSION_URL = "/version.json";
-  const APP_VERSION = "0.1.0";
-  const GAME_TIME_REFRESH_MS = 10_000;
-  const PLAYER_REFRESH_MS = 10_000;
-  const ACTIVITY_REFRESH_MS = 10_000;
-  const MAP_ENTITY_REFRESH_MS = 10_000;
-  const TRADER_EXPLORATION_REFRESH_MS = 5_000;
-  const SERVER_VERSION_REFRESH_MS = 60_000;
-  const APP_VERSION_REFRESH_MS = 60_000;
-  const GAME_SCHEDULE_REFRESH_MS = 60_000;
-  const RESTART_STATUS_REFRESH_MS = 5_000;
+  const APP_VERSION = "0.2.0";
+  const GAME_TIME_REFRESH_MS = configInteger(
+    "gameTimeRefreshMs", 10_000, 1_000
+  );
+  const PLAYER_REFRESH_MS = configInteger(
+    "playerRefreshMs", 10_000, 1_000
+  );
+  const ACTIVITY_REFRESH_MS = configInteger(
+    "activityRefreshMs", 10_000, 1_000
+  );
+  const MAP_ENTITY_REFRESH_MS = configInteger(
+    "mapEntityRefreshMs", 10_000, 1_000
+  );
+  const TRADER_EXPLORATION_REFRESH_MS = configInteger(
+    "traderExplorationRefreshMs", 5_000, 1_000
+  );
+  const SERVER_VERSION_REFRESH_MS = configInteger(
+    "serverVersionRefreshMs", 60_000, 1_000
+  );
+  const APP_VERSION_REFRESH_MS = configInteger(
+    "appVersionRefreshMs", 60_000, 1_000
+  );
+  const GAME_SCHEDULE_REFRESH_MS = configInteger(
+    "gameScheduleRefreshMs", 60_000, 1_000
+  );
+  const RESTART_STATUS_REFRESH_MS = configInteger(
+    "restartStatusRefreshMs", 5_000, 1_000
+  );
   const PLAYER_AUTH_STORAGE_KEY = "7dtd-map-player-auth";
   const PLAYER_FOLLOW_STORAGE_KEY = "7dtd-map-player-follow";
   const APP_RELOAD_VIEW_STORAGE_KEY = "7dtd-map-reload-view";
   const GUIDE_SEEN_STORAGE_KEY = "7dtd-map-guide-seen-v1";
-  const UNEXPLORED_TILE_MAX_BYTES = 400;
-  const TILE_RETRY_DELAYS_MS = [0, 250, 750, 1500];
-  const CONFIG_RETRY_DELAYS_MS = [0, 300, 900];
-  const UNEXPLORED_TILE_REFRESH_MS = 5_000;
-  const MOVING_PLAYER_MIN_SPEED_MPS = 4;
-  const MOVING_VEHICLE_MATCH_RADIUS = 160;
-  const MOVING_VEHICLE_RELEASE_MS = 20_000;
+  const UNEXPLORED_TILE_MAX_BYTES = configInteger(
+    "unexploredTileMaxBytes", 400, 1
+  );
+  const TILE_RETRY_DELAYS_MS = configIntegerList(
+    "tileRetryDelaysMs", [0, 250, 750, 1500]
+  );
+  const CONFIG_RETRY_DELAYS_MS = configIntegerList(
+    "configRetryDelaysMs", [0, 300, 900]
+  );
+  const UNEXPLORED_TILE_REFRESH_MS = configInteger(
+    "unexploredTileRefreshMs", 5_000, 1_000
+  );
+  const MOVING_PLAYER_MIN_SPEED_MPS = configNumber(
+    "movingPlayerMinSpeedMps", 4
+  );
+  const MOVING_VEHICLE_MATCH_RADIUS = configNumber(
+    "movingVehicleMatchRadius", 160, 1
+  );
+  const MOVING_VEHICLE_RELEASE_MS = configInteger(
+    "movingVehicleReleaseMs", 20_000, 1_000
+  );
   const TRANSPARENT_TILE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
   const BICYCLE_ICON = `
     <svg class="map-entity-symbol" viewBox="0 0 24 24" aria-hidden="true">
