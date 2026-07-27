@@ -1,0 +1,109 @@
+services:
+  player-auth:
+    build:
+      context: ./player-auth
+    image: local/7dtd-player-auth:latest
+    container_name: 7dtd-player-auth
+    environment:
+      - MAX_FAILURES=5
+      - FAILURE_WINDOW_SECONDS=3600
+      - BLOCK_SECONDS=86400
+      - PLAYER_UPSTREAM_URL=http://${SEVEN_DAYS_HOST}:${SEVEN_DAYS_WEB_PORT:-8080}/api/player
+      - PLAYER_API_TOKEN_NAME=${PLAYER_API_TOKEN_NAME:-map-player-reader}
+      - ACTIVITY_UPSTREAM_URL=http://${SEVEN_DAYS_HOST}:${SEVEN_DAYS_WEB_PORT:-8080}/api/log?count=-500
+      - ACTIVITY_API_TOKEN_NAME=${ACTIVITY_API_TOKEN_NAME:-map-activity-reader}
+      - ACTIVITY_POLL_SECONDS=10
+      - ACTIVITY_RETENTION_SECONDS=604800
+      - ACTIVITY_MAX_EVENTS=2000
+      - ACTIVITY_PUBLIC_LIMIT=200
+      - RESTART_ENABLED=${RESTART_ENABLED:-false}
+      - RESTART_DELAY_SECONDS=300
+      - RESTART_COOLDOWN_SECONDS=1800
+      - RESTART_FAILURE_COOLDOWN_SECONDS=300
+    ports:
+      - "${AGENT_BIND_IP:-127.0.0.1}:${AGENT_PORT:-18081}:8080"
+    networks:
+      - player_map_backend
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    secrets:
+      - player_map_password_hash
+      - restart_agent_token
+      - player_api_token
+      - activity_api_token
+    volumes:
+      - player_auth_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen(
+          'http://127.0.0.1:8080/health', timeout=2).read()
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  7dtd-map:
+    build:
+      context: .
+    image: local/7dtd-map:latest
+    container_name: 7dtd-map
+    environment:
+      - SEVEN_DAYS_HOST=${SEVEN_DAYS_HOST}
+      - SEVEN_DAYS_WEB_PORT=${SEVEN_DAYS_WEB_PORT:-8080}
+      - VIRTUAL_HOST=${PUBLIC_HOST}
+      - VIRTUAL_PORT=8080
+      - LETSENCRYPT_HOST=${PUBLIC_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    networks:
+      - container_network
+      - player_map_backend
+    depends_on:
+      player-auth:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    volumes:
+      - map_tile_cache:/var/cache/nginx/map
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  container_network:
+    external: true
+    name: ${PUBLIC_NETWORK_NAME:-container_network}
+  player_map_backend:
+
+secrets:
+  player_map_password_hash:
+    file: ./secrets/player-map.password-hash
+  restart_agent_token:
+    file: ./secrets/restart-agent.token
+  player_api_token:
+    file: ./secrets/player-api.token
+  activity_api_token:
+    file: ./secrets/activity-api.token
+
+volumes:
+  player_auth_data:
+  map_tile_cache:

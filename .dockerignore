@@ -1,0 +1,11 @@
+.git
+.github
+.env
+secrets
+mod
+windows-agent
+scripts
+**/__pycache__
+**/bin
+**/obj
+*.md

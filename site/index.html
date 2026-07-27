@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#8f9691">
+    <meta name="description" content="7 Days to Die Dedicated Serverの探索済みエリアを表示するライブWebマップ">
+    <meta name="robots" content="noindex, nofollow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="7DTD Live Map">
+    <meta property="og:description" content="7 Days to Die dedicated server cartography">
+    <title>7DTD Live Map</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=0.1.0">
+    <link rel="stylesheet" href="/assets/leaflet.css">
+    <link rel="stylesheet" href="/assets/styles.css?v=0.1.0">
+  </head>
+  <body>
+    <main class="map-shell">
+      <div id="map" aria-label="7 Days to Dieの探索済み地図"></div>
+
+      <header class="site-header">
+        <div class="brand-mark" aria-hidden="true">
+          <span>7</span>
+        </div>
+        <div class="brand-copy">
+          <p class="eyebrow">SURVIVOR CARTOGRAPHY // DEDICATED NODE</p>
+          <h1>7DTD Live Map</h1>
+          <p class="subtitle">LIVE TERRITORY MAP</p>
+        </div>
+      </header>
+
+      <section class="server-status" aria-live="polite">
+        <span id="status-dot" class="status-dot is-loading"></span>
+        <span id="status-text">MAP LINKING</span>
+        <span id="server-version" class="server-version">SERVER V—</span>
+        <button id="server-status-control" type="button">DETAIL</button>
+      </section>
+
+      <section class="game-time" aria-live="polite">
+        <span class="game-time-label">GAME TIME</span>
+        <span id="game-day" class="game-day">DAY —</span>
+        <span id="game-clock" class="game-clock">--:--</span>
+        <span id="game-mode" class="game-mode">MODE —</span>
+        <div class="horde-estimate">
+          <div class="horde-heading">
+            <span>NEXT HORDE</span>
+            <strong id="horde-day">DAY —</strong>
+          </div>
+          <div class="horde-detail">
+            <span id="horde-countdown">計算待機中</span>
+            <time id="horde-eta">現実時刻 —</time>
+          </div>
+        </div>
+      </section>
+
+      <button
+        id="player-access"
+        class="player-access"
+        type="button"
+        aria-haspopup="dialog"
+        aria-pressed="false"
+      >
+        PLAYERS LOCKED
+      </button>
+
+      <label id="player-follow-shell" class="player-follow" hidden>
+        <span class="visually-hidden">自動追従するプレイヤー</span>
+        <select id="player-follow" aria-label="自動追従するプレイヤー">
+          <option value="">FOLLOW · NO PLAYERS</option>
+        </select>
+      </label>
+
+      <button
+        id="player-info-control"
+        class="player-info-control"
+        type="button"
+        aria-haspopup="dialog"
+        hidden
+      >
+        PLAYER INFO
+      </button>
+
+      <button
+        id="layers-control"
+        class="layers-control"
+        type="button"
+        aria-haspopup="dialog"
+        hidden
+      >
+        MAP LAYERS
+      </button>
+
+      <button
+        id="restart-control"
+        class="restart-control"
+        type="button"
+        aria-haspopup="dialog"
+        hidden
+      >
+        SERVER RESTART
+      </button>
+
+      <button
+        id="activity-control"
+        class="activity-control"
+        type="button"
+        aria-haspopup="dialog"
+        hidden
+      >
+        SERVER HISTORY
+      </button>
+
+      <button
+        id="guide-control"
+        class="guide-control"
+        type="button"
+        aria-haspopup="dialog"
+      >
+        ? 使い方
+      </button>
+
+      <nav class="map-controls" aria-label="地図操作">
+        <button id="zoom-in" type="button" aria-label="拡大">＋</button>
+        <button id="zoom-out" type="button" aria-label="縮小">−</button>
+        <span class="control-divider" aria-hidden="true"></span>
+        <button id="reset-view" type="button" aria-label="地図全体を表示">⌖</button>
+      </nav>
+
+      <section class="coordinate-panel" aria-live="polite">
+        <p class="panel-label">FIELD COORDINATES</p>
+        <p id="coordinates" class="coordinate-value">E — / N —</p>
+        <p class="coordinate-hint">地図上をポイントして座標を確認</p>
+      </section>
+
+      <div class="map-legend" aria-hidden="true">
+        <span class="legend-line"></span>
+        <span>EXPLORED TERRITORY</span>
+      </div>
+
+      <section id="loading-panel" class="loading-panel" aria-live="polite">
+        <div class="loading-reticle" aria-hidden="true"></div>
+        <p class="loading-code">WORLD MAP / LIVE</p>
+        <h2 id="loading-title">地図データに接続中</h2>
+        <p id="loading-message">探索記録を読み込んでいます</p>
+        <button id="retry-button" class="retry-button" type="button" hidden>再接続</button>
+      </section>
+
+      <footer class="site-footer">
+        <span>DEDICATED SERVER FEED</span>
+        <span class="footer-separator" aria-hidden="true">/</span>
+        <span>EXPLORED AREAS ONLY</span>
+      </footer>
+    </main>
+
+    <dialog id="player-dialog" class="player-dialog" aria-labelledby="player-dialog-title">
+      <form id="player-form" method="dialog">
+        <p class="dialog-code">SURVIVOR SIGNAL</p>
+        <h2 id="player-dialog-title">プレイヤーを表示</h2>
+        <p class="dialog-description">合い言葉を入力すると、オンライン中のプレイヤー、探索済みエリアのトレーダー、補給物資、ドローン、車両の位置を表示します。</p>
+        <label for="player-passphrase">合い言葉</label>
+        <input
+          id="player-passphrase"
+          name="passphrase"
+          type="password"
+          autocomplete="off"
+          required
+        >
+        <p id="player-error" class="player-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="player-cancel" type="button">キャンセル</button>
+          <button class="player-submit" type="submit">表示する</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="guide-dialog" class="guide-dialog" aria-labelledby="guide-dialog-title">
+      <section class="guide-shell">
+        <header class="guide-header">
+          <div>
+            <p class="dialog-code">MAP FIELD GUIDE</p>
+            <h2 id="guide-dialog-title">この地図の使い方</h2>
+            <p class="dialog-description">地図を見るだけなら、そのままドラッグ・拡大できます。追加機能は合い言葉で開きます。</p>
+          </div>
+          <button id="guide-close" class="activity-close" type="button" aria-label="使い方を閉じる">×</button>
+        </header>
+        <ol class="guide-steps">
+          <li>
+            <strong>地図を見る</strong>
+            <span>ドラッグで移動、ホイールや＋−で拡大縮小。⌖で地図全体へ戻ります。</span>
+          </li>
+          <li>
+            <strong>プレイヤー機能へログイン</strong>
+            <span><b>PLAYERS LOCKED</b> を押して合い言葉を入力すると、オンライン位置・履歴・再起動操作が開きます。</span>
+          </li>
+          <li>
+            <strong>プレイヤーを自動追従</strong>
+            <span>ログイン後の <b>FOLLOW</b> から名前を選ぶと、10秒ごとの位置更新に合わせて地図が追従します。</span>
+          </li>
+          <li>
+            <strong>プレイヤー情報を見る</strong>
+            <span><b>PLAYER INFO</b> で全プレイヤーのレベルと最終座標を確認できます。HP、ping、ゲームステージはオンライン時だけ表示します。</span>
+          </li>
+          <li>
+            <strong>トレーダー・物資・乗り物を確認</strong>
+            <span>ログイン後は探索済みエリアのトレーダー、補給物資、ドローン、車両も表示します。未探索のトレーダーは探索時に自動表示されます。高速移動中は位置ずれを防ぐため、乗車中と思われる車両マーカーだけ一時的に隠れます。</span>
+          </li>
+          <li>
+            <strong>次のホードを確認</strong>
+            <span>右上に次回ホードまでの残り時間と予想現実時刻を表示します。起動中の平日・休日モードを自動反映します。</span>
+          </li>
+        </ol>
+        <p class="guide-note">この案内は右下の「? 使い方」からいつでも再表示できます。</p>
+        <button id="guide-start" class="guide-start" type="button">地図を見る</button>
+      </section>
+    </dialog>
+
+    <dialog id="restart-dialog" class="player-dialog restart-dialog" aria-labelledby="restart-dialog-title">
+      <form id="restart-form" method="dialog">
+        <p class="dialog-code">SERVER CONTROL</p>
+        <h2 id="restart-dialog-title">サーバーを再起動</h2>
+        <p class="dialog-description">
+          5分後にゲームサーバーを再起動します。開始前なら中止できます。
+          確認のため <strong>RESTART</strong> と入力してください。
+        </p>
+        <label for="restart-confirmation">確認文字</label>
+        <input
+          id="restart-confirmation"
+          name="confirmation"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        >
+        <p id="restart-error" class="player-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="restart-dialog-cancel" type="button">戻る</button>
+          <button class="player-submit" type="submit">5分後に再起動</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="activity-dialog" class="activity-dialog" aria-labelledby="activity-dialog-title">
+      <section class="activity-shell">
+        <header class="activity-header">
+          <div>
+            <p class="dialog-code">SURVIVOR EVENT FEED</p>
+            <h2 id="activity-dialog-title">サーバー履歴</h2>
+            <p class="dialog-description">直近7日間のチャット、入退室、死亡を表示します。</p>
+          </div>
+          <button id="activity-close" class="activity-close" type="button" aria-label="履歴を閉じる">×</button>
+        </header>
+        <div class="activity-toolbar" role="group" aria-label="履歴の絞り込み">
+          <button class="is-active" type="button" data-activity-filter="all">すべて</button>
+          <button type="button" data-activity-filter="chat">チャット</button>
+          <button type="button" data-activity-filter="access">入退室</button>
+          <button type="button" data-activity-filter="death">死亡</button>
+          <button id="activity-refresh" class="activity-refresh" type="button">更新</button>
+        </div>
+        <p id="activity-status" class="activity-status" aria-live="polite">履歴を読み込んでいます</p>
+        <ol id="activity-list" class="activity-list" aria-live="polite"></ol>
+        <p id="activity-empty" class="activity-empty" hidden>該当する履歴はありません。</p>
+      </section>
+    </dialog>
+
+    <dialog id="player-info-dialog" class="player-info-dialog" aria-labelledby="player-info-dialog-title">
+      <section class="player-info-shell">
+        <header class="activity-header">
+          <div>
+            <p class="dialog-code">SURVIVOR STATUS ROSTER</p>
+            <h2 id="player-info-dialog-title">プレイヤー情報</h2>
+            <p class="dialog-description">レベルと最終座標はオフライン時も保持します。HP、ping、ゲームステージはオンライン時だけ表示します。</p>
+          </div>
+          <button id="player-info-close" class="activity-close" type="button" aria-label="プレイヤー情報を閉じる">×</button>
+        </header>
+        <p id="player-info-status" class="activity-status" aria-live="polite">プレイヤー情報を読み込んでいます</p>
+        <div class="player-info-table-wrap">
+          <table class="player-info-table">
+            <thead>
+              <tr>
+                <th scope="col">プレイヤー</th>
+                <th scope="col">LEVEL</th>
+                <th scope="col">GAME STAGE</th>
+                <th scope="col">HP</th>
+                <th scope="col">PING</th>
+                <th scope="col">最終座標</th>
+                <th scope="col">最終保存</th>
+              </tr>
+            </thead>
+            <tbody id="player-info-body"></tbody>
+          </table>
+        </div>
+        <p id="player-info-empty" class="activity-empty" hidden>プレイヤー情報はまだありません。</p>
+      </section>
+    </dialog>
+
+    <dialog id="layers-dialog" class="layers-dialog" aria-labelledby="layers-dialog-title">
+      <section class="layers-shell">
+        <header class="activity-header">
+          <div>
+            <p class="dialog-code">TACTICAL OVERLAYS</p>
+            <h2 id="layers-dialog-title">マップレイヤー</h2>
+            <p class="dialog-description">個人位置を含むレイヤーは初期状態で非表示です。</p>
+          </div>
+          <button id="layers-close" class="activity-close" type="button" aria-label="レイヤーを閉じる">×</button>
+        </header>
+        <div class="layer-options">
+          <label><input type="checkbox" data-map-layer="shared_waypoint">共有地点</label>
+          <label><input type="checkbox" data-map-layer="quest">クエスト地点</label>
+          <label><input type="checkbox" data-map-layer="bedroll">寝袋位置</label>
+          <label><input type="checkbox" data-map-layer="biome">バイオーム</label>
+        </div>
+        <label class="layer-player-filter">
+          <span>プレイヤー</span>
+          <select id="layer-player-filter">
+            <option value="">全員</option>
+          </select>
+        </label>
+        <label class="biome-opacity">
+          <span>バイオーム透明度</span>
+          <input id="biome-opacity" type="range" min="10" max="80" value="45">
+        </label>
+        <p id="layers-status" class="activity-status" aria-live="polite">レイヤーを選択してください</p>
+      </section>
+    </dialog>
+
+    <dialog id="server-status-dialog" class="layers-dialog" aria-labelledby="server-status-dialog-title">
+      <section class="layers-shell">
+        <header class="activity-header">
+          <div>
+            <p class="dialog-code">DEDICATED SERVER TELEMETRY</p>
+            <h2 id="server-status-dialog-title">サーバー状態</h2>
+            <p class="dialog-description">ゲーム本体から取得した読み取り専用の稼働統計です。</p>
+          </div>
+          <button id="server-status-close" class="activity-close" type="button" aria-label="サーバー状態を閉じる">×</button>
+        </header>
+        <dl class="server-status-grid">
+          <div><dt>状態</dt><dd id="server-detail-state">確認中</dd></div>
+          <div><dt>バージョン</dt><dd id="server-detail-version">—</dd></div>
+          <div><dt>ゲーム内日時</dt><dd id="server-detail-time">—</dd></div>
+          <div><dt>プレイヤー</dt><dd id="server-detail-players">—</dd></div>
+          <div><dt>稼働時間</dt><dd id="server-detail-uptime">ログイン後に表示</dd></div>
+          <div><dt>FPS</dt><dd id="server-detail-fps">ログイン後に表示</dd></div>
+          <div><dt>メモリ</dt><dd id="server-detail-memory">ログイン後に表示</dd></div>
+          <div><dt>ゾンビ / エンティティ</dt><dd id="server-detail-entities">ログイン後に表示</dd></div>
+          <div><dt>最終取得</dt><dd id="server-detail-updated">—</dd></div>
+        </dl>
+      </section>
+    </dialog>
+
+    <script src="/assets/leaflet.js"></script>
+    <script src="/assets/app.js?v=0.1.0"></script>
+  </body>
+</html>

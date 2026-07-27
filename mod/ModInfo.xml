@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml>
+  <Name value="LiveMapServerTools" />
+  <DisplayName value="Live Map Server Tools" />
+  <Description value="公開Webマップ用の安全な統計コマンドと全員共有地点連携を追加する。" />
+  <Author value="7DTD Live Map contributors" />
+  <Version value="1.1.0" />
+</xml>
