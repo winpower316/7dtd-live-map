@@ -1196,12 +1196,22 @@ function Invoke-Announcement {
         [Parameter(Mandatory)]
         [string]$Action,
         [Parameter(Mandatory)]
-        [string]$JobId
+        [string]$JobId,
+        [int]$RemainingSeconds = 0
     )
 
     $message = switch ($Action) {
-        'announce_5_minutes' {
-            'Restart in 5 min. You can still cancel it.'
+        'announce_scheduled' {
+            $duration = if (
+                $RemainingSeconds -ge 60 -and
+                $RemainingSeconds % 60 -eq 0
+            ) {
+                '{0} min' -f [int]($RemainingSeconds / 60)
+            }
+            else {
+                '{0} sec' -f [math]::Max(1, $RemainingSeconds)
+            }
+            "Server restart scheduled in $duration. You can still cancel it."
         }
         'announce_1_minute' {
             'Server restart scheduled in 1 minute.'
@@ -1554,40 +1564,51 @@ do {
         if ($EnableRestart) {
             $action = Get-AgentAction -Headers $agentHeaders
             if ($null -ne $action) {
-            $actionName = [string]$action.action
-            $jobId = [string]$action.jobId
-            if ($actionName -eq 'restart') {
-                if ($DryRun) {
-                    Write-RestartAudit `
-                        -Event 'dry_run_restart_claimed' `
-                        -JobId $jobId
+                $actionName = [string]$action.action
+                $jobId = [string]$action.jobId
+                if ($actionName -eq 'restart') {
+                    if ($DryRun) {
+                        Write-RestartAudit `
+                            -Event 'dry_run_restart_claimed' `
+                            -JobId $jobId
+                    }
+                    else {
+                        try {
+                            Invoke-GameRestart -JobId $jobId
+                            Complete-AgentAction `
+                                -Headers $agentHeaders `
+                                -JobId $jobId `
+                                -Success $true `
+                                -Result 'server_ready'
+                        }
+                        catch {
+                            $failure = $_.Exception.Message
+                            Write-RestartAudit `
+                                -Event 'restart_failed' `
+                                -JobId $jobId `
+                                -Detail $failure
+                            Complete-AgentAction `
+                                -Headers $agentHeaders `
+                                -JobId $jobId `
+                                -Success $false `
+                                -Result $failure
+                        }
+                    }
                 }
                 else {
-                    try {
-                        Invoke-GameRestart -JobId $jobId
-                        Complete-AgentAction `
-                            -Headers $agentHeaders `
-                            -JobId $jobId `
-                            -Success $true `
-                            -Result 'server_ready'
+                    $remainingSeconds = 0
+                    if (
+                        $null -ne $action.PSObject.Properties[
+                            'remainingSeconds'
+                        ]
+                    ) {
+                        $remainingSeconds = [int]$action.remainingSeconds
                     }
-                    catch {
-                        $failure = $_.Exception.Message
-                        Write-RestartAudit `
-                            -Event 'restart_failed' `
-                            -JobId $jobId `
-                            -Detail $failure
-                        Complete-AgentAction `
-                            -Headers $agentHeaders `
-                            -JobId $jobId `
-                            -Success $false `
-                            -Result $failure
-                    }
+                    Invoke-Announcement `
+                        -Action $actionName `
+                        -JobId $jobId `
+                        -RemainingSeconds $remainingSeconds
                 }
-            }
-            else {
-                Invoke-Announcement -Action $actionName -JobId $jobId
-            }
             }
         }
     }

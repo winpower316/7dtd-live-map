@@ -266,7 +266,8 @@ class RestartStoreTests(unittest.TestCase):
         job_id = requested["jobId"]
 
         action = self.store.next_agent_action(now=1000)
-        self.assertEqual(action["action"], "announce_5_minutes")
+        self.assertEqual(action["action"], "announce_scheduled")
+        self.assertEqual(action["remainingSeconds"], 300)
         self.assertIsNone(self.store.next_agent_action(now=1001))
 
         action = self.store.next_agent_action(now=1240)
@@ -279,6 +280,19 @@ class RestartStoreTests(unittest.TestCase):
         action = self.store.next_agent_action(now=1300)
         self.assertEqual(action, {"action": "restart", "jobId": job_id})
         self.assertIsNone(self.store.next_agent_action(now=1301))
+
+    def test_initial_announcement_uses_configured_delay(self) -> None:
+        store = RestartStore(
+            Path(self.temporary_directory.name) / "custom-delay.sqlite3",
+            delay_seconds=600,
+            cooldown_seconds=1800,
+            failure_cooldown_seconds=300,
+        )
+        store.request("198.51.100.10", now=1000)
+
+        action = store.next_agent_action(now=1000)
+        self.assertEqual(action["action"], "announce_scheduled")
+        self.assertEqual(action["remainingSeconds"], 600)
 
     def test_cancellation_is_announced_only_if_countdown_was_announced(
         self,

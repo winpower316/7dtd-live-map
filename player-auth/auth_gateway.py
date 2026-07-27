@@ -1271,7 +1271,7 @@ class RestartStore:
                 (10, 4, "announce_10_seconds"),
                 (30, 3, "announce_30_seconds"),
                 (60, 2, "announce_1_minute"),
-                (self.delay_seconds, 1, "announce_5_minutes"),
+                (self.delay_seconds, 1, "announce_scheduled"),
             )
             for threshold, stage, action in stages:
                 if remaining <= threshold and row["announcement_stage"] < stage:
