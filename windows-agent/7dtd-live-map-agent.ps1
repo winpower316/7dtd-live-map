@@ -1,10 +1,14 @@
 [CmdletBinding()]
 param(
+    [string]$ConfigPath = '',
     [string]$ApiBase = 'http://127.0.0.1:18081',
     [string]$TokenPath = 'C:\ProgramData\7dtd-web-restart\agent.token',
     [string]$StartShortcut = 'C:\7dtd-server\startdedicated.bat.lnk',
     [string]$AuditPath = 'C:\ProgramData\7dtd-web-map\agent-audit.jsonl',
     [string]$GameRoot = 'C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die',
+    [string]$TelnetHost = '127.0.0.1',
+    [ValidateRange(1, 65535)]
+    [int]$TelnetPort = 8081,
     [ValidateSet('weekday', 'holiday', 'custom')]
     [string]$ScheduleMode = 'custom',
     [ValidateRange(0, 1440)]
@@ -14,6 +18,26 @@ param(
     [int]$MapEntityPublishIntervalSeconds = 10,
     [ValidateRange(5, 300)]
     [int]$PlayerSnapshotPublishIntervalSeconds = 10,
+    [ValidateRange(5, 3600)]
+    [int]$VersionPublishIntervalSeconds = 60,
+    [ValidateRange(5, 3600)]
+    [int]$SchedulePublishIntervalSeconds = 60,
+    [ValidateRange(5, 3600)]
+    [int]$ServerStatusPublishIntervalSeconds = 30,
+    [ValidateRange(1, 1440)]
+    [int]$BiomePublishIntervalMinutes = 60,
+    [ValidateRange(1, 300)]
+    [int]$RetryIntervalSeconds = 30,
+    [ValidateRange(1, 300)]
+    [int]$PollIntervalSeconds = 10,
+    [ValidateRange(1, 300)]
+    [int]$RequestTimeoutSeconds = 10,
+    [ValidateRange(1, 300)]
+    [int]$BiomeUploadTimeoutSeconds = 15,
+    [ValidateRange(10, 900)]
+    [int]$ShutdownTimeoutSeconds = 90,
+    [ValidateRange(30, 1800)]
+    [int]$StartupTimeoutSeconds = 240,
     [switch]$EnableRestart,
     [switch]$Once,
     [switch]$DryRun
@@ -22,6 +46,82 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+if ($ConfigPath) {
+    $agentConfig = Import-PowerShellDataFile -LiteralPath $ConfigPath
+    $allowedConfigKeys = @(
+        'ApiBase',
+        'TokenPath',
+        'StartShortcut',
+        'AuditPath',
+        'GameRoot',
+        'TelnetHost',
+        'TelnetPort',
+        'ScheduleMode',
+        'DayNightLengthMinutes',
+        'MaintenanceTaskName',
+        'MapEntityPublishIntervalSeconds',
+        'PlayerSnapshotPublishIntervalSeconds',
+        'VersionPublishIntervalSeconds',
+        'SchedulePublishIntervalSeconds',
+        'ServerStatusPublishIntervalSeconds',
+        'BiomePublishIntervalMinutes',
+        'RetryIntervalSeconds',
+        'PollIntervalSeconds',
+        'RequestTimeoutSeconds',
+        'BiomeUploadTimeoutSeconds',
+        'ShutdownTimeoutSeconds',
+        'StartupTimeoutSeconds',
+        'EnableRestart',
+        'Once',
+        'DryRun'
+    )
+    foreach ($key in $agentConfig.Keys) {
+        if ($key -notin $allowedConfigKeys) {
+            throw "未対応のエージェント設定です: $key"
+        }
+        if (-not $PSBoundParameters.ContainsKey($key)) {
+            Set-Variable -Name $key -Value $agentConfig[$key]
+        }
+    }
+}
+
+$allowedScheduleModes = @('weekday', 'holiday', 'custom')
+if ($ScheduleMode -notin $allowedScheduleModes) {
+    throw "ScheduleModeは次のいずれかを指定してください: $($allowedScheduleModes -join ', ')"
+}
+$rangeChecks = @{
+    TelnetPort = @($TelnetPort, 1, 65535)
+    DayNightLengthMinutes = @($DayNightLengthMinutes, 0, 1440)
+    MapEntityPublishIntervalSeconds = @(
+        $MapEntityPublishIntervalSeconds, 5, 300
+    )
+    PlayerSnapshotPublishIntervalSeconds = @(
+        $PlayerSnapshotPublishIntervalSeconds, 5, 300
+    )
+    VersionPublishIntervalSeconds = @(
+        $VersionPublishIntervalSeconds, 5, 3600
+    )
+    SchedulePublishIntervalSeconds = @(
+        $SchedulePublishIntervalSeconds, 5, 3600
+    )
+    ServerStatusPublishIntervalSeconds = @(
+        $ServerStatusPublishIntervalSeconds, 5, 3600
+    )
+    BiomePublishIntervalMinutes = @($BiomePublishIntervalMinutes, 1, 1440)
+    RetryIntervalSeconds = @($RetryIntervalSeconds, 1, 300)
+    PollIntervalSeconds = @($PollIntervalSeconds, 1, 300)
+    RequestTimeoutSeconds = @($RequestTimeoutSeconds, 1, 300)
+    BiomeUploadTimeoutSeconds = @($BiomeUploadTimeoutSeconds, 1, 300)
+    ShutdownTimeoutSeconds = @($ShutdownTimeoutSeconds, 10, 900)
+    StartupTimeoutSeconds = @($StartupTimeoutSeconds, 30, 1800)
+}
+foreach ($rangeName in $rangeChecks.Keys) {
+    $range = $rangeChecks[$rangeName]
+    if ($range[0] -lt $range[1] -or $range[0] -gt $range[2]) {
+        throw "$rangeName は $($range[1])～$($range[2]) の範囲で指定してください。"
+    }
+}
 
 function Write-RestartAudit {
     param(
@@ -128,9 +228,9 @@ function Send-GameCommand {
 
     $client = [System.Net.Sockets.TcpClient]::new()
     try {
-        $connectTask = $client.ConnectAsync('127.0.0.1', 8081)
+        $connectTask = $client.ConnectAsync($TelnetHost, $TelnetPort)
         if (-not $connectTask.Wait(5000) -or -not $client.Connected) {
-            throw '7DTD Telnet (127.0.0.1:8081) に接続できません。'
+            throw "7DTD Telnet ($TelnetHost`:$TelnetPort) に接続できません。"
         }
         $stream = $client.GetStream()
         $null = Receive-GameTelnetText `
@@ -161,9 +261,9 @@ function Get-GameCommandResponse {
 
     $client = [System.Net.Sockets.TcpClient]::new()
     try {
-        $connectTask = $client.ConnectAsync('127.0.0.1', 8081)
+        $connectTask = $client.ConnectAsync($TelnetHost, $TelnetPort)
         if (-not $connectTask.Wait(5000) -or -not $client.Connected) {
-            throw '7DTD Telnet (127.0.0.1:8081) に接続できません。'
+            throw "7DTD Telnet ($TelnetHost`:$TelnetPort) に接続できません。"
         }
         $stream = $client.GetStream()
         $null = Receive-GameTelnetText `
@@ -507,7 +607,7 @@ function Publish-GameMapEntities {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
 
     if ($response.StatusCode -ne 200) {
@@ -801,7 +901,7 @@ function Publish-PlayerSnapshot {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
     if ($response.StatusCode -ne 200) {
         throw "プレイヤー情報通知APIが HTTP $($response.StatusCode) を返しました。"
@@ -857,7 +957,7 @@ function Publish-BiomeImage {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 15 `
+        -TimeoutSec $BiomeUploadTimeoutSeconds `
         -SkipHttpErrorCheck
     if ($response.StatusCode -ne 200) {
         throw "バイオーム画像通知APIが HTTP $($response.StatusCode) を返しました。"
@@ -893,7 +993,7 @@ function Publish-GameServerStatus {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
     if ($response.StatusCode -ne 200) {
         throw "サーバー統計通知APIが HTTP $($response.StatusCode) を返しました。"
@@ -975,7 +1075,7 @@ function Publish-GameServerVersion {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
 
     if ($response.StatusCode -ne 200) {
@@ -1030,7 +1130,7 @@ function Publish-GameSchedule {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
 
     if ($response.StatusCode -ne 200) {
@@ -1048,7 +1148,7 @@ function Get-AgentAction {
         -Uri "$ApiBase/internal/restart/agent" `
         -Headers $Headers `
         -Method Get `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
 
     if ($response.StatusCode -eq 204) {
@@ -1083,7 +1183,7 @@ function Complete-AgentAction {
         -ContentType 'application/json' `
         -Body $body `
         -Method Post `
-        -TimeoutSec 10 `
+        -TimeoutSec $RequestTimeoutSeconds `
         -SkipHttpErrorCheck
 
     if ($response.StatusCode -ne 200) {
@@ -1096,12 +1196,22 @@ function Invoke-Announcement {
         [Parameter(Mandatory)]
         [string]$Action,
         [Parameter(Mandatory)]
-        [string]$JobId
+        [string]$JobId,
+        [int]$RemainingSeconds = 0
     )
 
     $message = switch ($Action) {
-        'announce_5_minutes' {
-            'Restart in 5 min. You can still cancel it.'
+        'announce_scheduled' {
+            $duration = if (
+                $RemainingSeconds -ge 60 -and
+                $RemainingSeconds % 60 -eq 0
+            ) {
+                '{0} min' -f [int]($RemainingSeconds / 60)
+            }
+            else {
+                '{0} sec' -f [math]::Max(1, $RemainingSeconds)
+            }
+            "Server restart scheduled in $duration. You can still cancel it."
         }
         'announce_1_minute' {
             'Server restart scheduled in 1 minute.'
@@ -1151,7 +1261,7 @@ function Invoke-GameRestart {
         return
     }
 
-    $shutdownDeadline = (Get-Date).AddSeconds(90)
+    $shutdownDeadline = (Get-Date).AddSeconds($ShutdownTimeoutSeconds)
     do {
         $serverProcesses = @(
             Get-Process -Name '7DaysToDieServer', '7DaysToDie' `
@@ -1179,7 +1289,7 @@ function Invoke-GameRestart {
     Start-Process -FilePath $StartShortcut
     Write-RestartAudit -Event 'start_shortcut_invoked' -JobId $JobId
 
-    $startupDeadline = (Get-Date).AddSeconds(240)
+    $startupDeadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
     do {
         $processReady = $null -ne (
             Get-Process -Name '7DaysToDieServer', '7DaysToDie' `
@@ -1187,8 +1297,8 @@ function Invoke-GameRestart {
                 Select-Object -First 1
         )
         $telnetReady = Test-TcpPort `
-            -HostName '127.0.0.1' `
-            -Port 8081 `
+            -HostName $TelnetHost `
+            -Port $TelnetPort `
             -TimeoutMilliseconds 1000
         $loginReady = Test-GameLoginReady
         if ($processReady -and $telnetReady -and $loginReady) {
@@ -1198,7 +1308,7 @@ function Invoke-GameRestart {
         Start-Sleep -Seconds 5
     } while ((Get-Date) -lt $startupDeadline)
 
-    throw '起動後240秒以内にプロセス、Telnet、Steamログオンの正常性を確認できませんでした。'
+    throw "起動後$StartupTimeoutSeconds秒以内にプロセス、Telnet、Steamログオンの正常性を確認できませんでした。"
 }
 
 if (-not (Test-Path -LiteralPath $TokenPath -PathType Leaf)) {
@@ -1254,13 +1364,17 @@ do {
                         -Detail $runtimeVersion
                     $lastPublishedVersion = $runtimeVersion
                 }
-                $nextVersionPublish = (Get-Date).AddSeconds(60)
+                $nextVersionPublish = (Get-Date).AddSeconds(
+                    $VersionPublishIntervalSeconds
+                )
             }
             catch {
                 Write-RestartAudit `
                     -Event 'server_version_publish_error' `
                     -Detail $_.Exception.Message
-                $nextVersionPublish = (Get-Date).AddSeconds(30)
+                $nextVersionPublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
@@ -1283,13 +1397,17 @@ do {
                         -Detail $scheduleSummary
                     $lastPublishedSchedule = $scheduleSummary
                 }
-                $nextSchedulePublish = (Get-Date).AddSeconds(60)
+                $nextSchedulePublish = (Get-Date).AddSeconds(
+                    $SchedulePublishIntervalSeconds
+                )
             }
             catch {
                 Write-RestartAudit `
                     -Event 'game_schedule_publish_error' `
                     -Detail $_.Exception.Message
-                $nextSchedulePublish = (Get-Date).AddSeconds(30)
+                $nextSchedulePublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
@@ -1338,7 +1456,9 @@ do {
                 Write-RestartAudit `
                     -Event 'map_entities_publish_error' `
                     -Detail $_.Exception.Message
-                $nextEntityPublish = (Get-Date).AddSeconds(30)
+                $nextEntityPublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
@@ -1361,13 +1481,17 @@ do {
                         -Detail $statusSummary
                     $lastPublishedServerStatus = $statusSummary
                 }
-                $nextServerStatusPublish = (Get-Date).AddSeconds(30)
+                $nextServerStatusPublish = (Get-Date).AddSeconds(
+                    $ServerStatusPublishIntervalSeconds
+                )
             }
             catch {
                 Write-RestartAudit `
                     -Event 'server_status_publish_error' `
                     -Detail $_.Exception.Message
-                $nextServerStatusPublish = (Get-Date).AddSeconds(30)
+                $nextServerStatusPublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
@@ -1386,13 +1510,17 @@ do {
                         -Detail "sha256=$biomeHash"
                     $lastPublishedBiomeHash = $biomeHash
                 }
-                $nextBiomePublish = (Get-Date).AddHours(1)
+                $nextBiomePublish = (Get-Date).AddMinutes(
+                    $BiomePublishIntervalMinutes
+                )
             }
             catch {
                 Write-RestartAudit `
                     -Event 'biome_image_publish_error' `
                     -Detail $_.Exception.Message
-                $nextBiomePublish = (Get-Date).AddMinutes(5)
+                $nextBiomePublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
@@ -1427,47 +1555,60 @@ do {
                 Write-RestartAudit `
                     -Event 'player_snapshot_publish_error' `
                     -Detail $_.Exception.Message
-                $nextPlayerSnapshotPublish = (Get-Date).AddSeconds(30)
+                $nextPlayerSnapshotPublish = (Get-Date).AddSeconds(
+                    $RetryIntervalSeconds
+                )
             }
         }
 
         if ($EnableRestart) {
             $action = Get-AgentAction -Headers $agentHeaders
             if ($null -ne $action) {
-            $actionName = [string]$action.action
-            $jobId = [string]$action.jobId
-            if ($actionName -eq 'restart') {
-                if ($DryRun) {
-                    Write-RestartAudit `
-                        -Event 'dry_run_restart_claimed' `
-                        -JobId $jobId
+                $actionName = [string]$action.action
+                $jobId = [string]$action.jobId
+                if ($actionName -eq 'restart') {
+                    if ($DryRun) {
+                        Write-RestartAudit `
+                            -Event 'dry_run_restart_claimed' `
+                            -JobId $jobId
+                    }
+                    else {
+                        try {
+                            Invoke-GameRestart -JobId $jobId
+                            Complete-AgentAction `
+                                -Headers $agentHeaders `
+                                -JobId $jobId `
+                                -Success $true `
+                                -Result 'server_ready'
+                        }
+                        catch {
+                            $failure = $_.Exception.Message
+                            Write-RestartAudit `
+                                -Event 'restart_failed' `
+                                -JobId $jobId `
+                                -Detail $failure
+                            Complete-AgentAction `
+                                -Headers $agentHeaders `
+                                -JobId $jobId `
+                                -Success $false `
+                                -Result $failure
+                        }
+                    }
                 }
                 else {
-                    try {
-                        Invoke-GameRestart -JobId $jobId
-                        Complete-AgentAction `
-                            -Headers $agentHeaders `
-                            -JobId $jobId `
-                            -Success $true `
-                            -Result 'server_ready'
+                    $remainingSeconds = 0
+                    if (
+                        $null -ne $action.PSObject.Properties[
+                            'remainingSeconds'
+                        ]
+                    ) {
+                        $remainingSeconds = [int]$action.remainingSeconds
                     }
-                    catch {
-                        $failure = $_.Exception.Message
-                        Write-RestartAudit `
-                            -Event 'restart_failed' `
-                            -JobId $jobId `
-                            -Detail $failure
-                        Complete-AgentAction `
-                            -Headers $agentHeaders `
-                            -JobId $jobId `
-                            -Success $false `
-                            -Result $failure
-                    }
+                    Invoke-Announcement `
+                        -Action $actionName `
+                        -JobId $jobId `
+                        -RemainingSeconds $remainingSeconds
                 }
-            }
-            else {
-                Invoke-Announcement -Action $actionName -JobId $jobId
-            }
             }
         }
     }
@@ -1478,6 +1619,6 @@ do {
     }
 
     if (-not $Once) {
-        Start-Sleep -Seconds 10
+        Start-Sleep -Seconds $PollIntervalSeconds
     }
 } while (-not $Once)

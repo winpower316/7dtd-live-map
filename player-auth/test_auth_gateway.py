@@ -8,6 +8,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from auth_gateway import (
     ActivityStore,
@@ -30,7 +31,27 @@ from auth_gateway import (
     validate_player_profiles,
     validate_server_status,
     validate_server_version,
+    _env_int,
 )
+
+
+class EnvironmentConfigurationTests(unittest.TestCase):
+    def test_integer_setting_uses_default_and_override(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(_env_int("TEST_SETTING", 10, 1, 20), 10)
+        with patch.dict("os.environ", {"TEST_SETTING": "15"}, clear=True):
+            self.assertEqual(_env_int("TEST_SETTING", 10, 1, 20), 15)
+
+    def test_integer_setting_rejects_invalid_or_unsafe_value(self) -> None:
+        for value in ("invalid", "0", "21"):
+            with self.subTest(value=value):
+                with patch.dict(
+                    "os.environ",
+                    {"TEST_SETTING": value},
+                    clear=True,
+                ):
+                    with self.assertRaises(RuntimeError):
+                        _env_int("TEST_SETTING", 10, 1, 20)
 
 
 class AuthStoreTests(unittest.TestCase):
@@ -245,7 +266,8 @@ class RestartStoreTests(unittest.TestCase):
         job_id = requested["jobId"]
 
         action = self.store.next_agent_action(now=1000)
-        self.assertEqual(action["action"], "announce_5_minutes")
+        self.assertEqual(action["action"], "announce_scheduled")
+        self.assertEqual(action["remainingSeconds"], 300)
         self.assertIsNone(self.store.next_agent_action(now=1001))
 
         action = self.store.next_agent_action(now=1240)
@@ -258,6 +280,19 @@ class RestartStoreTests(unittest.TestCase):
         action = self.store.next_agent_action(now=1300)
         self.assertEqual(action, {"action": "restart", "jobId": job_id})
         self.assertIsNone(self.store.next_agent_action(now=1301))
+
+    def test_initial_announcement_uses_configured_delay(self) -> None:
+        store = RestartStore(
+            Path(self.temporary_directory.name) / "custom-delay.sqlite3",
+            delay_seconds=600,
+            cooldown_seconds=1800,
+            failure_cooldown_seconds=300,
+        )
+        store.request("198.51.100.10", now=1000)
+
+        action = store.next_agent_action(now=1000)
+        self.assertEqual(action["action"], "announce_scheduled")
+        self.assertEqual(action["remainingSeconds"], 600)
 
     def test_cancellation_is_announced_only_if_countdown_was_announced(
         self,

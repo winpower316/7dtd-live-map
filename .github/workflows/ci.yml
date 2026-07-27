@@ -20,7 +20,13 @@ jobs:
       - name: Python tests
         run: python -m unittest discover -s player-auth -p "test_*.py" -v
       - name: Public tree safety check
-        run: python scripts/check_public_tree.py
+        run: |
+          python scripts/check_public_tree.py
+          python scripts/check_config_surface.py
+      - name: Frontend JavaScript syntax check
+        run: |
+          node --check site/config.js
+          node --check site/assets/app.js
       - name: PowerShell syntax check
         shell: pwsh
         run: |
@@ -34,8 +40,31 @@ jobs:
             $errors | ForEach-Object { Write-Error $_ }
             exit 1
           }
+          Import-PowerShellDataFile `
+            -LiteralPath ./windows-agent/config.example.psd1 |
+            Out-Null
+      - name: Compose configuration check
+        run: docker compose --env-file .env.example config --quiet
       - name: Build frontend image
         run: docker build --tag 7dtd-live-map:test .
+      - name: Frontend runtime configuration smoke test
+        run: |
+          docker run --detach --name 7dtd-live-map-test \
+            --env SEVEN_DAYS_HOST=127.0.0.1 \
+            --env FRONTEND_PLAYER_REFRESH_MS=12345 \
+            7dtd-live-map:test
+          trap 'docker rm --force 7dtd-live-map-test' EXIT
+          for attempt in 1 2 3 4 5; do
+            if docker exec 7dtd-live-map-test \
+              wget -q -O /tmp/config-response.js \
+              http://127.0.0.1:8080/config.js; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec 7dtd-live-map-test \
+            grep -F 'playerRefreshMs: "12345"' \
+            /tmp/config-response.js
       - name: Build gateway image
         run: docker build --tag 7dtd-live-map-gateway:test player-auth
 

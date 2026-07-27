@@ -20,3 +20,5 @@ dotnet build -c Release `
 ```
 
 生成された `LiveMapServerTools.dll` を `ModInfo.xml` とともに、ゲームサーバーの `Mods\LiveMapServerTools` へ配置する。DLLの読み込みにはゲームサーバーの再起動が必要。
+
+全員共有ウェイポイントの保持件数を変更する場合は、`config.example.json`を同じディレクトリの`config.json`へコピーして`sharedWaypointMaximumEntries`を1～5000の範囲で指定する。未配置時は200件。

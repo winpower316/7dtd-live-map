@@ -1,0 +1,20 @@
+window.LIVE_MAP_CONFIG = Object.freeze({
+  mapNativeMaxZoom: 4,
+  mapTileSize: 128,
+  gameTimeRefreshMs: 10000,
+  playerRefreshMs: 10000,
+  activityRefreshMs: 10000,
+  mapEntityRefreshMs: 10000,
+  traderExplorationRefreshMs: 5000,
+  serverVersionRefreshMs: 60000,
+  appVersionRefreshMs: 60000,
+  gameScheduleRefreshMs: 60000,
+  restartStatusRefreshMs: 5000,
+  unexploredTileMaxBytes: 400,
+  tileRetryDelaysMs: [0, 250, 750, 1500],
+  configRetryDelaysMs: [0, 300, 900],
+  unexploredTileRefreshMs: 5000,
+  movingPlayerMinSpeedMps: 4,
+  movingVehicleMatchRadius: 160,
+  movingVehicleReleaseMs: 20000
+});

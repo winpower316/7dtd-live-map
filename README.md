@@ -78,6 +78,22 @@ cp .env.example .env
 
 `AGENT_BIND_IP`をLANアドレスにする場合は、Windowsゲームサーバー以外から接続できないようホストFWでも制限してください。
 
+`.env.example`には、次の調整値も既定値つきでまとめています。
+
+- 認証失敗回数、ブロック時間、履歴保持期間・件数
+- 再起動予約の遅延・クールダウン
+- ブラウザーの各更新間隔、地図タイル、再試行、車両追跡判定
+- nginxのレート制限、キャッシュ容量・期間、タイムアウト
+- Gatewayが受け付けるリクエスト、エンティティ、プレイヤーの安全上限
+
+変更後は`docker compose config`で展開結果を確認し、次のコマンドでコンテナを再作成します。
+
+```sh
+docker compose up -d --build --force-recreate
+```
+
+`MAX_REQUEST_BODY_BYTES`などの安全上限やnginxのレート制限を大きくする場合は、公開ホストのメモリと7DTD内蔵Web APIへの負荷も確認してください。
+
 ### Secretの作成
 
 ```sh
@@ -123,6 +139,9 @@ dotnet build .\mod\LiveMapServerTools.csproj -c Release `
 
 - `mod/ModInfo.xml`
 - `mod/bin/Release/net48/LiveMapServerTools.dll`
+- 任意: `mod/config.example.json`を`config.json`へコピー
+
+`config.json`では、全員共有ウェイポイントの保持上限を変更できます。指定可能な範囲は1～5000件で、未配置時は200件です。
 
 Modの読み込みにはゲームサーバーの再起動が必要です。
 
@@ -144,6 +163,18 @@ C:\ProgramData\7dtd-web-restart\agent.token
   -GameRoot 'C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die' `
   -Once
 ```
+
+繰り返し指定する値は、サンプルをコピーしたPowerShellデータファイルへ保存できます。
+
+```powershell
+Copy-Item .\windows-agent\config.example.psd1 `
+  C:\ProgramData\7dtd-web-map\agent-config.psd1
+.\windows-agent\7dtd-live-map-agent.ps1 `
+  -ConfigPath C:\ProgramData\7dtd-web-map\agent-config.psd1 `
+  -Once
+```
+
+コマンドラインで同じ引数を指定した場合は、設定ファイルよりコマンドラインを優先します。設定ファイルにはトークンそのものではなく`TokenPath`だけを記載してください。
 
 継続運転には、ログオン状態に依存しない専用ユーザーまたは適切な権限のWindowsタスクを使用します。エージェントは次をゲートウェイへ送信します。
 
@@ -183,6 +214,7 @@ C:\ProgramData\7dtd-web-restart\agent.token
 ```powershell
 python -m unittest discover -s player-auth -p "test_*.py" -v
 python scripts/check_public_tree.py
+python scripts/check_config_surface.py
 ```
 
 デプロイ後は少なくとも次を確認してください。

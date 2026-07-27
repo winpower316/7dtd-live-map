@@ -1,0 +1,20 @@
+window.LIVE_MAP_CONFIG = Object.freeze({
+  mapNativeMaxZoom: "${FRONTEND_MAP_NATIVE_MAX_ZOOM}",
+  mapTileSize: "${FRONTEND_MAP_TILE_SIZE}",
+  gameTimeRefreshMs: "${FRONTEND_GAME_TIME_REFRESH_MS}",
+  playerRefreshMs: "${FRONTEND_PLAYER_REFRESH_MS}",
+  activityRefreshMs: "${FRONTEND_ACTIVITY_REFRESH_MS}",
+  mapEntityRefreshMs: "${FRONTEND_MAP_ENTITY_REFRESH_MS}",
+  traderExplorationRefreshMs: "${FRONTEND_TRADER_EXPLORATION_REFRESH_MS}",
+  serverVersionRefreshMs: "${FRONTEND_SERVER_VERSION_REFRESH_MS}",
+  appVersionRefreshMs: "${FRONTEND_APP_VERSION_REFRESH_MS}",
+  gameScheduleRefreshMs: "${FRONTEND_GAME_SCHEDULE_REFRESH_MS}",
+  restartStatusRefreshMs: "${FRONTEND_RESTART_STATUS_REFRESH_MS}",
+  unexploredTileMaxBytes: "${FRONTEND_UNEXPLORED_TILE_MAX_BYTES}",
+  tileRetryDelaysMs: "${FRONTEND_TILE_RETRY_DELAYS_MS}",
+  configRetryDelaysMs: "${FRONTEND_CONFIG_RETRY_DELAYS_MS}",
+  unexploredTileRefreshMs: "${FRONTEND_UNEXPLORED_TILE_REFRESH_MS}",
+  movingPlayerMinSpeedMps: "${FRONTEND_MOVING_PLAYER_MIN_SPEED_MPS}",
+  movingVehicleMatchRadius: "${FRONTEND_MOVING_VEHICLE_MATCH_RADIUS}",
+  movingVehicleReleaseMs: "${FRONTEND_MOVING_VEHICLE_RELEASE_MS}"
+});
