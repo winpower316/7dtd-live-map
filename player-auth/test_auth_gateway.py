@@ -803,6 +803,51 @@ class PlayerStoreTests(unittest.TestCase):
         self.assertNotIn("platformId", json.dumps(current))
         self.assertNotIn("198.51.100.10", json.dumps(current))
 
+    def test_stale_online_only_name_is_removed_by_next_snapshot(self) -> None:
+        profiles = [
+            {
+                "name": "survivor",
+                "level": 40,
+                "profileSavedAt": 1234,
+            }
+        ]
+        self.store.publish(
+            profiles,
+            [
+                {
+                    "name": "EntityPlayer",
+                    "level": 40,
+                    "position": {"x": 1, "y": 2, "z": 3},
+                    "health": 100,
+                    "maxHealth": 120,
+                    "ping": 25,
+                    "gameStage": 81,
+                }
+            ],
+            now=1300,
+        )
+
+        current = self.store.publish(
+            profiles,
+            [
+                {
+                    "name": "survivor",
+                    "level": 40,
+                    "position": {"x": 4, "y": 5, "z": 6},
+                    "health": 100,
+                    "maxHealth": 120,
+                    "ping": 20,
+                    "gameStage": 82,
+                }
+            ],
+            now=1310,
+        )
+
+        self.assertEqual(
+            [player["name"] for player in current["roster"]],
+            ["survivor"],
+        )
+
     def test_player_validators_reject_duplicates_and_bad_values(self) -> None:
         with self.assertRaises(ValueError):
             validate_player_profiles(

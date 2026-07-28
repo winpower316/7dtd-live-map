@@ -755,6 +755,25 @@ class PlayerStore:
                         player["gameStage"],
                     ),
                 )
+            online_names = tuple(player["name"] for player in validated_online)
+            if online_names:
+                placeholders = ", ".join("?" for _ in online_names)
+                connection.execute(
+                    f"""
+                    DELETE FROM player_roster
+                    WHERE
+                        profile_saved_at IS NULL
+                        AND name NOT IN ({placeholders})
+                    """,
+                    online_names,
+                )
+            else:
+                connection.execute(
+                    """
+                    DELETE FROM player_roster
+                    WHERE profile_saved_at IS NULL
+                    """
+                )
             connection.execute(
                 """
                 INSERT INTO player_roster_meta (key, value)
