@@ -138,6 +138,20 @@ MAP_ENTITY_LABELS = {
     "quest": "クエスト地点",
     "shared_waypoint": "共有地点",
 }
+MAP_ENTITY_OWNER_KINDS = frozenset(
+    (
+        "drone",
+        "bicycle",
+        "minibike",
+        "motorcycle",
+        "four_by_four",
+        "gyrocopter",
+        "vehicle",
+        "bedroll",
+        "quest",
+        "shared_waypoint",
+    )
+)
 CHAT_PATTERN = re.compile(
     r"^Chat \(from '(.+)', entity id '[^']+', to '([^']+)'\): (.*)$"
 )
@@ -1816,7 +1830,7 @@ def validate_map_entities(entities: object) -> list[dict[str, object]]:
                 "entity label",
                 100,
             )
-        if accepts_private_metadata and "owner" in entity:
+        if kind in MAP_ENTITY_OWNER_KINDS and "owner" in entity:
             public_entity["owner"] = _validate_public_text(
                 entity["owner"],
                 "entity owner",

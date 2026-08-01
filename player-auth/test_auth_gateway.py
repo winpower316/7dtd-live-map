@@ -593,6 +593,7 @@ class MapEntityTests(unittest.TestCase):
                 "entityId": "12895",
                 "kind": "motorcycle",
                 "position": {"x": 1655.3, "y": 38.1, "z": 302.1},
+                "owner": "survivor",
             },
             {
                 "entityId": "5203252673",
@@ -605,7 +606,14 @@ class MapEntityTests(unittest.TestCase):
             store = MapEntityStore(database_path)
             published = store.publish(entities, now=1234)
             self.assertEqual(published["lastCollectedAt"], 1234)
-            self.assertNotIn("owner", json.dumps(published))
+            published_by_kind = {
+                entity["kind"]: entity for entity in published["entities"]
+            }
+            self.assertNotIn("owner", published_by_kind["supply"])
+            self.assertEqual(
+                published_by_kind["motorcycle"]["owner"],
+                "survivor",
+            )
 
             current = MapEntityStore(database_path).current()
             self.assertEqual(current["lastCollectedAt"], 1234.0)
@@ -613,7 +621,14 @@ class MapEntityTests(unittest.TestCase):
                 [entity["label"] for entity in current["entities"]],
                 ["オートバイ", "補給物資", "トレーダー・ジョエル"],
             )
-            self.assertNotIn("owner", json.dumps(current))
+            current_by_kind = {
+                entity["kind"]: entity for entity in current["entities"]
+            }
+            self.assertNotIn("owner", current_by_kind["supply"])
+            self.assertEqual(
+                current_by_kind["motorcycle"]["owner"],
+                "survivor",
+            )
 
     def test_snapshot_replaces_disappeared_entities(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -645,7 +660,7 @@ class MapEntityTests(unittest.TestCase):
                 ]
             )
 
-    def test_private_map_metadata_is_limited_to_private_kinds(self) -> None:
+    def test_entity_metadata_is_limited_to_allowed_kinds(self) -> None:
         entities = validate_map_entities(
             [
                 {
@@ -664,10 +679,22 @@ class MapEntityTests(unittest.TestCase):
                     "questCode": 99,
                     "position": {"x": 4, "y": 5, "z": 6},
                 },
+                {
+                    "entityId": "3",
+                    "kind": "drone",
+                    "label": "偽装ラベル",
+                    "owner": "survivor",
+                    "detail": "非公開情報",
+                    "position": {"x": 7, "y": 8, "z": 9},
+                },
             ]
         )
-        self.assertEqual(entities[0]["owner"], "survivor")
-        self.assertEqual(entities[1]["questCode"], 99)
+        by_kind = {entity["kind"]: entity for entity in entities}
+        self.assertEqual(by_kind["bedroll"]["owner"], "survivor")
+        self.assertEqual(by_kind["quest"]["questCode"], 99)
+        self.assertEqual(by_kind["drone"]["owner"], "survivor")
+        self.assertEqual(by_kind["drone"]["label"], "ドローン")
+        self.assertNotIn("detail", by_kind["drone"])
         with self.assertRaises(ValueError):
             validate_map_entities(
                 [

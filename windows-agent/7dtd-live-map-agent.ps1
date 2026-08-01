@@ -492,6 +492,47 @@ function Get-GeneratedWorldTraderEntities {
     return @($entities | Sort-Object kind, entityId)
 }
 
+function Get-MapEntityOwners {
+    $owners = @{}
+    $commandDll = Join-Path (
+        Join-Path $GameRoot 'Mods\LiveMapServerTools'
+    ) 'LiveMapServerTools.dll'
+    $gameProcess = Get-Process `
+        -Name '7DaysToDieServer' `
+        -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    $commandIsLoaded = (
+        $null -ne $gameProcess -and
+        (Test-Path -LiteralPath $commandDll -PathType Leaf) -and
+        $gameProcess.StartTime.ToUniversalTime() -ge
+            (Get-Item -LiteralPath $commandDll).LastWriteTimeUtc
+    )
+    if (-not $commandIsLoaded) {
+        return $owners
+    }
+
+    $ownerText = Get-GameCommandResponse `
+        -Command 'webentityowners' `
+        -StopPattern 'LIVEMAP_ENTITY_OWNER_END'
+    foreach (
+        $match in [regex]::Matches(
+            $ownerText,
+            '(?m)^LIVEMAP_ENTITY_OWNER (?<json>\{.+\})\r?$'
+        )
+    ) {
+        $record = $match.Groups['json'].Value | ConvertFrom-Json
+        $entityId = [string]$record.entityId
+        $owner = [string]$record.owner
+        if (
+            $entityId -match '^\d+$' -and
+            -not [string]::IsNullOrWhiteSpace($owner)
+        ) {
+            $owners[$entityId] = $owner
+        }
+    }
+    return $owners
+}
+
 function Get-GameMapEntities {
     param(
         [AllowEmptyCollection()]
@@ -499,6 +540,16 @@ function Get-GameMapEntities {
     )
 
     $entities = @{}
+    $ownerByEntityId = Get-MapEntityOwners
+    $ownedKinds = @(
+        'drone',
+        'bicycle',
+        'minibike',
+        'motorcycle',
+        'four_by_four',
+        'gyrocopter',
+        'vehicle'
+    )
 
     foreach ($trader in $WorldTraderEntities) {
         $kind = [string]$trader['kind']
@@ -550,12 +601,22 @@ function Get-GameMapEntities {
                 -EntityType 'EntityVehicle' `
                 -EntityName $vehicle.Name
             if ($null -ne $kind) {
+                $owner = if (
+                    $kind -in $ownedKinds -and
+                    $ownerByEntityId.ContainsKey([string]$vehicle.Id)
+                ) {
+                    [string]$ownerByEntityId[[string]$vehicle.Id]
+                }
+                else {
+                    ''
+                }
                 $entities["${kind}:$($vehicle.Id)"] = New-PublicMapEntity `
                     -EntityId $vehicle.Id `
                     -Kind $kind `
                     -X $vehicle.X `
                     -Y $vehicle.Y `
-                    -Z $vehicle.Z
+                    -Z $vehicle.Z `
+                    -Owner $owner
             }
         }
     }
@@ -575,12 +636,22 @@ function Get-GameMapEntities {
             continue
         }
         $entityId = $match.Groups['id'].Value
+        $owner = if (
+            $kind -in $ownedKinds -and
+            $ownerByEntityId.ContainsKey($entityId)
+        ) {
+            [string]$ownerByEntityId[$entityId]
+        }
+        else {
+            ''
+        }
         $entities["${kind}:$entityId"] = New-PublicMapEntity `
             -EntityId $entityId `
             -Kind $kind `
             -X ([double]$match.Groups['x'].Value) `
             -Y ([double]$match.Groups['y'].Value) `
-            -Z ([double]$match.Groups['z'].Value)
+            -Z ([double]$match.Groups['z'].Value) `
+            -Owner $owner
     }
 
     return @(
