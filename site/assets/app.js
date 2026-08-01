@@ -44,7 +44,7 @@
   const RESTART_REQUEST_URL = "/api/restart/request";
   const RESTART_CANCEL_URL = "/api/restart/cancel";
   const APP_VERSION_URL = "/version.json";
-  const APP_VERSION = "0.2.1";
+  const APP_VERSION = "0.2.2";
   const GAME_TIME_REFRESH_MS = configInteger(
     "gameTimeRefreshMs", 10_000, 1_000
   );
@@ -101,6 +101,8 @@
     "maintenanceTimeZone", "UTC"
   );
   const MAINTENANCE_WINDOWS = runtimeConfig.maintenanceWindows || "";
+  const WEEKLY_MAINTENANCE_WINDOWS =
+    runtimeConfig.weeklyMaintenanceWindows || "";
   const TRANSPARENT_TILE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
   const BICYCLE_ICON = `
     <svg class="map-entity-symbol" viewBox="0 0 24 24" aria-hidden="true">
@@ -2438,6 +2440,7 @@
         new Date(),
         MAINTENANCE_TIME_ZONE,
         MAINTENANCE_WINDOWS,
+        WEEKLY_MAINTENANCE_WINDOWS,
       );
       if (maintenanceWindow) {
         showError(

@@ -101,7 +101,10 @@ docker compose up -d --build --force-recreate
 ```dotenv
 FRONTEND_MAINTENANCE_TIME_ZONE=Asia/Tokyo
 FRONTEND_MAINTENANCE_WINDOWS=09:00-09:20,23:00-23:20
+FRONTEND_WEEKLY_MAINTENANCE_WINDOWS=Sun+Wed+Fri+Sat@20:00-20:20
 ```
+
+`FRONTEND_MAINTENANCE_WINDOWS`は毎日の時間帯です。曜日を限定する場合は`FRONTEND_WEEKLY_MAINTENANCE_WINDOWS`へ、英語3文字の曜日を`+`で連結して指定します。複数の週次時間帯はカンマで区切れます。
 
 ### Secretの作成
 

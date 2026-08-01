@@ -56,6 +56,7 @@ jobs:
             --env FRONTEND_PLAYER_REFRESH_MS=12345 \
             --env FRONTEND_MAINTENANCE_TIME_ZONE=Asia/Tokyo \
             --env FRONTEND_MAINTENANCE_WINDOWS=09:00-09:20,23:00-23:20 \
+            --env FRONTEND_WEEKLY_MAINTENANCE_WINDOWS=Sun+Wed+Fri+Sat@20:00-20:20 \
             7dtd-live-map:test
           trap 'docker rm --force 7dtd-live-map-test' EXIT
           for attempt in 1 2 3 4 5; do
@@ -74,6 +75,9 @@ jobs:
             /tmp/config-response.js
           docker exec 7dtd-live-map-test \
             grep -F 'maintenanceWindows: "09:00-09:20,23:00-23:20"' \
+            /tmp/config-response.js
+          docker exec 7dtd-live-map-test \
+            grep -F 'weeklyMaintenanceWindows: "Sun+Wed+Fri+Sat@20:00-20:20"' \
             /tmp/config-response.js
       - name: Build gateway image
         run: docker build --tag 7dtd-live-map-gateway:test player-auth

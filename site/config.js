@@ -18,5 +18,6 @@ window.LIVE_MAP_CONFIG = Object.freeze({
   movingVehicleMatchRadius: 160,
   movingVehicleReleaseMs: 20000,
   maintenanceTimeZone: "UTC",
-  maintenanceWindows: ""
+  maintenanceWindows: "",
+  weeklyMaintenanceWindows: ""
 });

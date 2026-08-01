@@ -18,5 +18,6 @@ window.LIVE_MAP_CONFIG = Object.freeze({
   movingVehicleMatchRadius: "${FRONTEND_MOVING_VEHICLE_MATCH_RADIUS}",
   movingVehicleReleaseMs: "${FRONTEND_MOVING_VEHICLE_RELEASE_MS}",
   maintenanceTimeZone: "${FRONTEND_MAINTENANCE_TIME_ZONE}",
-  maintenanceWindows: "${FRONTEND_MAINTENANCE_WINDOWS}"
+  maintenanceWindows: "${FRONTEND_MAINTENANCE_WINDOWS}",
+  weeklyMaintenanceWindows: "${FRONTEND_WEEKLY_MAINTENANCE_WINDOWS}"
 });
