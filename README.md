@@ -84,6 +84,7 @@ cp .env.example .env
 - 認証失敗回数、ブロック時間、履歴保持期間・件数
 - 再起動予約の遅延・クールダウン
 - ブラウザーの各更新間隔、地図タイル、再試行、車両追跡判定
+- 地図API失敗時に専用表示へ切り替える予定メンテナンス時間帯とタイムゾーン
 - nginxのレート制限、キャッシュ容量・期間、タイムアウト
 - Gatewayが受け付けるリクエスト、エンティティ、プレイヤーの安全上限
 
@@ -94,6 +95,13 @@ docker compose up -d --build --force-recreate
 ```
 
 `MAX_REQUEST_BODY_BYTES`などの安全上限やnginxのレート制限を大きくする場合は、公開ホストのメモリと7DTD内蔵Web APIへの負荷も確認してください。
+
+予定メンテナンス表示を使う場合は、たとえば毎日09:00と23:00から20分間を次のように指定します。地図APIが正常ならこの時間帯でも通常表示を続け、API取得に失敗した場合だけメンテナンス中の案内へ切り替わります。
+
+```dotenv
+FRONTEND_MAINTENANCE_TIME_ZONE=Asia/Tokyo
+FRONTEND_MAINTENANCE_WINDOWS=09:00-09:20,23:00-23:20
+```
 
 ### Secretの作成
 

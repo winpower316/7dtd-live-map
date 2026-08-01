@@ -16,5 +16,7 @@ window.LIVE_MAP_CONFIG = Object.freeze({
   unexploredTileRefreshMs: 5000,
   movingPlayerMinSpeedMps: 4,
   movingVehicleMatchRadius: 160,
-  movingVehicleReleaseMs: 20000
+  movingVehicleReleaseMs: 20000,
+  maintenanceTimeZone: "UTC",
+  maintenanceWindows: ""
 });

@@ -21,6 +21,10 @@
       ? normalized
       : fallback;
   };
+  const configString = (name, fallback = "") => {
+    const value = String(runtimeConfig[name] || "").trim();
+    return value || fallback;
+  };
 
   const MAP_NATIVE_MAX_ZOOM = configInteger("mapNativeMaxZoom", 4);
   const MAP_TILE_SIZE = configInteger("mapTileSize", 128, 32);
@@ -40,7 +44,7 @@
   const RESTART_REQUEST_URL = "/api/restart/request";
   const RESTART_CANCEL_URL = "/api/restart/cancel";
   const APP_VERSION_URL = "/version.json";
-  const APP_VERSION = "0.2.0";
+  const APP_VERSION = "0.2.1";
   const GAME_TIME_REFRESH_MS = configInteger(
     "gameTimeRefreshMs", 10_000, 1_000
   );
@@ -93,6 +97,10 @@
   const MOVING_VEHICLE_RELEASE_MS = configInteger(
     "movingVehicleReleaseMs", 20_000, 1_000
   );
+  const MAINTENANCE_TIME_ZONE = configString(
+    "maintenanceTimeZone", "UTC"
+  );
+  const MAINTENANCE_WINDOWS = runtimeConfig.maintenanceWindows || "";
   const TRANSPARENT_TILE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
   const BICYCLE_ICON = `
     <svg class="map-entity-symbol" viewBox="0 0 24 24" aria-hidden="true">
@@ -321,10 +329,14 @@
     elements.statusText.textContent = message;
   }
 
-  function showError(message) {
-    setStatus("offline", "MAP OFFLINE");
+  function showError(
+    message,
+    title = "地図を取得できません",
+    status = "MAP OFFLINE",
+  ) {
+    setStatus("offline", status);
     elements.loadingPanel.classList.remove("is-hidden");
-    elements.loadingTitle.textContent = "地図を取得できません";
+    elements.loadingTitle.textContent = title;
     elements.loadingMessage.textContent = message;
     elements.retryButton.hidden = false;
   }
@@ -2422,6 +2434,19 @@
         startGameTimeUpdates();
       }
     } catch (error) {
+      const maintenanceWindow = window.LiveMapMaintenance?.findWindow(
+        new Date(),
+        MAINTENANCE_TIME_ZONE,
+        MAINTENANCE_WINDOWS,
+      );
+      if (maintenanceWindow) {
+        showError(
+          `${maintenanceWindow.start}開始の予定メンテナンス時間です。終了までしばらくお待ちください`,
+          "定期メンテナンス中です",
+          "MAINTENANCE",
+        );
+        return;
+      }
       const reason = error.name === "AbortError"
         ? "サーバーからの応答がタイムアウトしました"
         : "しばらく待ってから再接続してください";

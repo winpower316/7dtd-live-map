@@ -16,5 +16,7 @@ window.LIVE_MAP_CONFIG = Object.freeze({
   unexploredTileRefreshMs: "${FRONTEND_UNEXPLORED_TILE_REFRESH_MS}",
   movingPlayerMinSpeedMps: "${FRONTEND_MOVING_PLAYER_MIN_SPEED_MPS}",
   movingVehicleMatchRadius: "${FRONTEND_MOVING_VEHICLE_MATCH_RADIUS}",
-  movingVehicleReleaseMs: "${FRONTEND_MOVING_VEHICLE_RELEASE_MS}"
+  movingVehicleReleaseMs: "${FRONTEND_MOVING_VEHICLE_RELEASE_MS}",
+  maintenanceTimeZone: "${FRONTEND_MAINTENANCE_TIME_ZONE}",
+  maintenanceWindows: "${FRONTEND_MAINTENANCE_WINDOWS}"
 });

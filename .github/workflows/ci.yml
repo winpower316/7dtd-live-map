@@ -26,7 +26,9 @@ jobs:
       - name: Frontend JavaScript syntax check
         run: |
           node --check site/config.js
+          node --check site/assets/maintenance.js
           node --check site/assets/app.js
+          node --test scripts/test_maintenance.js
       - name: PowerShell syntax check
         shell: pwsh
         run: |
@@ -52,6 +54,8 @@ jobs:
           docker run --detach --name 7dtd-live-map-test \
             --env SEVEN_DAYS_HOST=127.0.0.1 \
             --env FRONTEND_PLAYER_REFRESH_MS=12345 \
+            --env FRONTEND_MAINTENANCE_TIME_ZONE=Asia/Tokyo \
+            --env FRONTEND_MAINTENANCE_WINDOWS=09:00-09:20,23:00-23:20 \
             7dtd-live-map:test
           trap 'docker rm --force 7dtd-live-map-test' EXIT
           for attempt in 1 2 3 4 5; do
@@ -64,6 +68,12 @@ jobs:
           done
           docker exec 7dtd-live-map-test \
             grep -F 'playerRefreshMs: "12345"' \
+            /tmp/config-response.js
+          docker exec 7dtd-live-map-test \
+            grep -F 'maintenanceTimeZone: "Asia/Tokyo"' \
+            /tmp/config-response.js
+          docker exec 7dtd-live-map-test \
+            grep -F 'maintenanceWindows: "09:00-09:20,23:00-23:20"' \
             /tmp/config-response.js
       - name: Build gateway image
         run: docker build --tag 7dtd-live-map-gateway:test player-auth
