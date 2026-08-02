@@ -44,7 +44,7 @@
   const RESTART_REQUEST_URL = "/api/restart/request";
   const RESTART_CANCEL_URL = "/api/restart/cancel";
   const APP_VERSION_URL = "/version.json";
-  const APP_VERSION = "0.3.0";
+  const APP_VERSION = "0.3.1";
   const GAME_TIME_REFRESH_MS = configInteger(
     "gameTimeRefreshMs", 10_000, 1_000
   );
